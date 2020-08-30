@@ -28,11 +28,14 @@ open Elmish
 let withRouter
         (router: IRouter<'model, 'msg>)
         (program: Program<'model, 'msg>) =
-    { program with
-        init = fun comp ->
-            let model, initCmd = program.init comp
+
+    let mapInit init =
+        fun (comp: ProgramComponent<'model, 'msg>) ->
+            let model, initCmd = init comp
             let model, compCmd = comp.InitRouter(router, program, model)
-            model, initCmd @ compCmd }
+            model, initCmd @ compCmd
+
+    Program.map mapInit id id id id program
 
 /// Attach a router inferred from `makeMessage` and `getEndPoint` to `program`
 /// when it is run as the `Program` of a `ProgramComponent`.

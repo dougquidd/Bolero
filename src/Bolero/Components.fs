@@ -84,7 +84,7 @@ type ElmishComponent<'model, 'msg>() =
     abstract View : 'model -> Dispatch<'msg> -> Node
 
     override this.ShouldRender() =
-        base.ShouldRender(this.OldModel, this.Model)
+        this.ShouldRender(this.OldModel, this.Model)
 
     override this.Render() =
         this.OldModel <- this.Model
@@ -170,7 +170,7 @@ and [<AbstractClass>]
         base.StateHasChanged()
 
     member private this.ForceSetState(program, model, dispatch) =
-        view <- program.view model dispatch
+        view <- Program.view program model dispatch
         oldModel <- model
         this.InvokeAsync(this.StateHasChanged) |> ignore
         this.Router |> Option.iter (fun router ->
@@ -192,13 +192,17 @@ and [<AbstractClass>]
         let program = this.Program
         let setDispatch d =
             dispatch <- d
-        { program with
-            setState = fun model dispatch ->
+
+        let mapState _ =
+            fun model dispatch ->
                 this.SetState(program, model, dispatch)
-            init = fun arg ->
-                let model, cmd = program.init arg
+
+        let mapInit init =
+            fun arg ->
+                let model, cmd = init arg
                 model, setDispatch :: cmd
-        }
+
+        Program.map mapInit id id mapState id program
         |> Program.runWith this
 
     member internal this.InitRouter
@@ -212,7 +216,12 @@ and [<AbstractClass>]
         |> this.NavigationManager.LocationChanged.AddHandler
         match r.SetRoute (this.GetCurrentUri()) with
         | Some msg ->
-            program.update msg initModel
+            let mutable result = Unchecked.defaultof<('model * Cmd<'msg>)>
+            let mapUpdate update =
+                result <- update msg initModel
+                update
+            Program.map id mapUpdate id id id program |> ignore
+            result
         | None ->
             initModel, []
 
